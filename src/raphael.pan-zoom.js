@@ -96,8 +96,11 @@
             settings.maxZoom = options.maxZoom || 9;
             settings.minZoom = options.minZoom || 0;
             settings.zoomStep = options.zoomStep || 0.1;
+            settings.zoomCenter = options.zoomCenter || null;
             settings.initialZoom = options.initialZoom || 0;
             settings.initialPosition = options.initialPosition || { x: 0, y: 0 };
+            settings.enablePan = options.enablePan || true;
+            settings.enableZoom = options.enableZoom || true;
     
             this.currZoom = settings.initialZoom;
             this.currPos = settings.initialPosition;
@@ -127,6 +130,11 @@
                 if (!me.enabled) {
                     return false;
                 }
+
+                if (!settings.enablePan) {
+                    return false;
+                }
+
                 var evt = window.event || e,
                     newWidth = paper.width * (1 - (me.currZoom * settings.zoomStep)),
                     newHeight = paper.height * (1 - (me.currZoom * settings.zoomStep)),
@@ -156,7 +164,13 @@
                 } else if (me.currZoom > settings.maxZoom) {
                     me.currZoom = settings.maxZoom;
                 } else {
-                    centerPoint = centerPoint || { x: paper.width / 2, y: paper.height / 2 };
+                    if (!centerPoint) {
+                        if (settings.zoomCenter === null) {
+                            centerPoint = { x: paper.width / 2, y: paper.height / 2 };
+                        } else {
+                            centerPoint = settings.zoomCenter;
+                        }
+                    }
     
                     deltaX = ((paper.width * settings.zoomStep) * (centerPoint.x / paper.width)) * val;
                     deltaY = (paper.height * settings.zoomStep) * (centerPoint.y / paper.height) * val;
@@ -171,6 +185,11 @@
                 if (!me.enabled) {
                     return false;
                 }
+
+                if (!settings.enableZoom) {
+                    return false;
+                }
+
                 var evt = window.event || e,
                     delta = evt.detail || evt.wheelDelta * -1,
                     zoomCenter = getRelativePosition(evt, container);
@@ -180,8 +199,13 @@
                 } else if (delta < 0) {
                     delta = 1;
                 }
+
+                if (settings.zoomCenter !== null) {
+                    applyZoom(delta, settings.zoomCenter);
+                } else {
+                    applyZoom(delta, zoomCenter);
+                }
                 
-                applyZoom(delta, zoomCenter);
                 if (evt.preventDefault) {
                     evt.preventDefault();
                 } else {
@@ -197,6 +221,11 @@
                 if (!me.enabled) {
                     return false;
                 }
+
+                if (!settings.enablePan) {
+                    return false;
+                }
+
                 me.dragTime = 0;
                 initialPos = getRelativePosition(evt, container);
                 container.className += " grabbing";
