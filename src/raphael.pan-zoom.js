@@ -101,6 +101,7 @@
             settings.initialPosition = options.initialPosition || { x: 0, y: 0 };
             settings.enablePan = options.enablePan || true;
             settings.enableZoom = options.enableZoom || true;
+            settings.redrawCallback = options.redrawCallback || null;
     
             this.currZoom = settings.initialZoom;
             this.currPos = settings.initialPosition;
@@ -124,6 +125,14 @@
                     me.currPos.y = (paper.height * me.currZoom * settings.zoomStep);
                 }
                 paper.setViewBox(me.currPos.x, me.currPos.y, newWidth, newHeight);
+
+                if (settings.redrawCallback !== null) {
+                    if (typeof settings.redrawCallback == "string") {
+                        eval(settings.redrawCallback);
+                    } else {
+                        settings.redrawCallback();
+                    }
+                }
             }
             
             function dragging(e) {
