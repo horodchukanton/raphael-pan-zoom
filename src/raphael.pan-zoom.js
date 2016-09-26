@@ -28,7 +28,10 @@
     
     function getRelativePosition(e, obj) {
         var x, y, pos;
-        if (e.pageX || e.pageY) {
+        if (e.deltaX || e.deltaY) {
+            x = e.deltaX;
+            y = e.deltaY;
+        } else if (e.pageX || e.pageY) {
             x = e.pageX;
             y = e.pageY;
         } else {
@@ -136,29 +139,26 @@
             }
             
             function dragging(e) {
-                if (!me.enabled) {
-                    return false;
-                }
+                if (!me.enabled) { return false; }
+                if (!settings.enablePan) { return false; }
 
-                if (!settings.enablePan) {
-                    return false;
-                }
+                var newWidth = paper.width * (1 - (me.currZoom * settings.zoomStep)),
+                    newHeight = paper.height * (1 - (me.currZoom * settings.zoomStep));
 
-                var evt = window.event || e,
-                    newWidth = paper.width * (1 - (me.currZoom * settings.zoomStep)),
-                    newHeight = paper.height * (1 - (me.currZoom * settings.zoomStep)),
-                    newPoint = getRelativePosition(evt, container);
-    
+                var evt = window.event || e;
+                
+                var newPoint = getRelativePosition(e, container);
+
                 deltaX = (newWidth * (newPoint.x - initialPos.x) / paper.width) * -1;
                 deltaY = (newHeight * (newPoint.y - initialPos.y) / paper.height) * -1;
                 initialPos = newPoint;
     
                 repaint();
                 me.dragTime += 1;
-                if (evt.preventDefault) {
-                    evt.preventDefault();
+                if (window.event.preventDefault) {
+                    window.event.preventDefault();
                 } else {
-                    evt.returnValue = false;
+                    window.event.returnValue = false;
                 }
                 return false;
             }
@@ -189,15 +189,18 @@
             }
     
             this.applyZoom = applyZoom;
+
+            function applyPan(dX, dY) {
+                deltaX = dX;
+                deltaY = dY;
+                repaint();
+            }
+            
+            this.applyPan = applyPan;
             
             function handleScroll(e) {
-                if (!me.enabled) {
-                    return false;
-                }
-
-                if (!settings.enableZoom) {
-                    return false;
-                }
+                if (!me.enabled) { return false; }
+                if (!settings.enableZoom) { return false; }
 
                 var evt = window.event || e,
                     delta = evt.detail || evt.wheelDelta * -1,
@@ -223,51 +226,45 @@
                 return false;
             }
             
-            repaint();
-    
-            container.onmousedown = function (e) {
-                var evt = window.event || e;
-                if (!me.enabled) {
-                    return false;
-                }
-
-                if (!settings.enablePan) {
-                    return false;
-                }
-
-                me.dragTime = 0;
-                initialPos = getRelativePosition(evt, container);
-                container.className += " grabbing";
-                container.onmousemove = dragging;
-                document.onmousemove = function () { return false; };
-                if (evt.preventDefault) {
-                    evt.preventDefault();
-                } else {
-                    evt.returnValue = false;
-                }
-                return false;
-            };
-    
-            container.onmouseup = function (e) {
-                //Remove class framework independent
-                document.onmousemove = null;
-                container.className = container.className.replace(/(?:^|\s)grabbing(?!\S)/g, '');
-                container.onmousemove = null;
-            };
-    
             if (container.attachEvent) {//if IE (and Opera depending on user setting)
                 container.attachEvent("on" + mousewheelevt, handleScroll);
             } else if (container.addEventListener) {//WC3 browsers
                 container.addEventListener(mousewheelevt, handleScroll, false);
             }
-            
-            function applyPan(dX, dY) {
-                deltaX = dX;
-                deltaY = dY;
-                repaint();
-            }
-            
-            this.applyPan = applyPan;
+
+            var touchManager = new Hammer.Manager(container, { touchAction: "none" });
+            var touchPan = new Hammer.Pan();
+            var touchPinch = new Hammer.Pinch();
+
+            touchPinch.recognizeWith([touchPan]);
+
+            touchManager.add(touchPan);
+            touchManager.add(touchPinch);
+
+            touchManager.on("panstart", function(e) {
+                initialPos = getRelativePosition(e, container);
+            });
+            touchManager.on("panmove", function(e) {
+                dragging(e);
+            });
+            touchManager.on("panend", function(e) {
+                initialPos = getRelativePosition(e, container);
+            });
+
+            touchManager.on("pinchstart", function(e) {
+                e.preventDefault();
+                container.pinchLastScale = 1;
+            });
+            touchManager.on("pinchmove", function(e) {
+                e.preventDefault();
+                applyZoom(Math.log(e.scale / container.pinchLastScale) * 5, e.center);
+                container.pinchLastScale = e.scale;
+            });
+            touchManager.on("pinchend", function(e) {
+                e.preventDefault();
+            });
+
+            repaint();
         };
 
     PanZoom.prototype = panZoomFunctions;
